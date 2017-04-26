@@ -17,6 +17,7 @@
 
 /*Worker1 key*/
 #define WORKER_1_KEY 1234
+#define MASTER_1_KEY 1034
 
 
 #endif /*_DEFINE_H_*/

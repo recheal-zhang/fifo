@@ -10,8 +10,6 @@
 
 #include "Epoll.h"
 #include "Util.h"
-#include "INETAddr.h"
-#include "SockConnector.h"
 
 #include "DefineVal.h"
 
@@ -28,23 +26,13 @@ int Epoll::getEpollfd() const{
     return _epollfd;
 }
 
-
-void Epoll::getSockAcceptorInfo(SOCKAcceptor *sockAcceptor){
-    _sockAcceptor = sockAcceptor;
-    addEvent(_sockAcceptor->_sockfd, EPOLLIN | EPOLLET);
-    _sockfd = _sockAcceptor->_sockfd;
-
-    memset(buf, 0, RECVMAXSIZE);
+void Epoll::addFifoWriteFdInfo(int fd){
+    _fifoFdToServer = fd;
 }
 
-void Epoll::addFifoFdFromClient(int fifoFd){
+void Epoll::addFifoFdFromServer(int fifoFd){
     addEvent(fifoFd, EPOLLIN | EPOLLET);
-    _fifoFdFromClientVec.push_back(fifoFd);
-}
-
-void Epoll::addFifoFdToClient(int fifoFdFromClient,
-        int fifoFdToClient){
-    _fifoMap[fifoFdFromClient] = fifoFdToClient;
+    _fifoFdFromServer = fifoFd;
 }
 
 void Epoll::monitor(){
@@ -66,34 +54,14 @@ void Epoll::handleEvents(int eventNum, int listenfd){
         }
         else if(events[i].events & EPOLLIN){
             //TODO: add query num
-            int nread;
-
-            //----------------------------------------
-            //if the msg come from server2
-            //TODO: Md5
-            if(fd == SockConnector::_sockfd){
-                //TODO:read, write into shareMemory
-                //and send msg to worker via fifo
-            }
-            else if(fd == listenfd){
-                handleAccept(listenfd);
-            }
-            else if(CUtil::findFifoFdFromVec(
-                        _fifoFdFromClientVec,
-                        fd
-                        )){
+            if(fd == _fifoFdFromServer){
                 //come from client FIFO
                 bzero(buf, RECVMAXSIZE);
                 CUtil::readMsgFromFifo(fd, buf, RECVMAXSIZE);
                 std::cout << buf << std::endl;
                 bzero(buf, RECVMAXSIZE);
-
-                char msg[5] = "0000";
-                std::cout << "_fifoMap[" << fd << "]="
-                    <<_fifoMap[fd] << std::endl;
-                CUtil::writeMsgToFifo(_fifoMap[fd],
-                        msg,
-                        5);
+                char msg[5] = "1234";
+                CUtil::writeMsgToFifo(_fifoFdToServer, msg, 5);
 
             }
             else{
@@ -105,7 +73,7 @@ void Epoll::handleEvents(int eventNum, int listenfd){
             //TODO:
         }
 
-        else if((events[i].events & EPOLLERR) ){
+        else if((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP)){
 #ifdef DEBUG
             std::cout << "epoll error" << std::endl;
 #endif /*DEBUG*/
@@ -114,21 +82,21 @@ void Epoll::handleEvents(int eventNum, int listenfd){
     }
 }
 
-void Epoll::handleAccept(int listenfd){
-    int clifd = _sockAcceptor->cliAccept();
-    if(clifd == -1){
-#ifdef DEBUG
-        std::cout << "accept error" << std::endl;
-#endif /*DEBUG*/
-        return ;
-    }
-
-#ifdef NONBLOCK
-    CUtil::setNonblock(clifd);
-#endif /*NONBLOCK*/
-
-    addEvent(clifd, EPOLLIN | EPOLLET);
-}
+//void Epoll::handleAccept(int listenfd){
+//    int clifd = _sockAcceptor->cliAccept();
+//    if(clifd == -1){
+//#ifdef DEBUG
+//        std::cout << "accept error" << std::endl;
+//#endif /*DEBUG*/
+//        return ;
+//    }
+//
+//#ifdef NONBLOCK
+//    CUtil::setNonblock(clifd);
+//#endif /*NONBLOCK*/
+//
+//    addEvent(clifd, EPOLLIN | EPOLLET);
+//}
 
 void Epoll::addEvent(const int &fd, const int &state){
     struct epoll_event ev;

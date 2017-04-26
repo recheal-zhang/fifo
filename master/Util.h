@@ -84,6 +84,14 @@ class CUtil{
 #endif /*DEBUG*/
             }
         }
+        static void writeMsgToFifo(int fifofd, void *buf, size_t len){
+            int nwrite;
+            if((nwrite = write(fifofd, buf, len)) == -1){
+#ifdef DEBUG
+                std::cout << "write error in Util fifo" << std::endl;
+#endif /*DEBUG*/
+            }
+        }
 
         static void readMsgFromFifo(int fifoFd,
                 void *buf,

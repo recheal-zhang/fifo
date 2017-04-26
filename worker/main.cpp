@@ -6,6 +6,7 @@
 #include "Util.h"
 #include "Define.h"
 #include "Fifo.h"
+#include "Epoll.h"
 
 using namespace std;
 
@@ -23,10 +24,17 @@ int main(){
                     0);
 
     char msg[5] = "1234";
-    while(true){
-        CUtil::writeMsgToFifo(fd, msg, 5);
-        sleep(1);
-    }
+    CUtil::writeMsgToFifo(fd, msg, 5);
 
+    Epoll workerEpoll;
+
+    std::string fifoServerName =
+        CUtil::getFifoName(MASTER_1_KEY);
+    workerEpoll.addFifoWriteFdInfo(fd);
+    workerEpoll.addFifoFdFromServer(
+            CUtil::openfileReadonlyNonblock(
+                fifoServerName.c_str()));
+
+    workerEpoll.monitor();
     return 0;
 }
